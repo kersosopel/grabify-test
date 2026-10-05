@@ -6,7 +6,7 @@ app.use(express.json());
 // Włączamy zaufanie do Reverse Proxy (wymagane na Render / Koyeb dla poprawnego IP)
 app.enable('trust proxy');
 
-// Docelowa strona przekierowania
+// Docelowa strona przekierowania niech to leci
 const TARGET_URL = 'https://www.lovethegarden.com/pl-pl/przewodnik-upraw/Jak-uprawiac-i-pielegnowac-lilie';
 
 // 0. Endpoint do podtrzymywania działania (Dla UptimeRobota)
